@@ -13,10 +13,6 @@ AGOL_PASSWORD = os.getenv("AGOL_PASSWORD")
 AGOL_ITEM_ID = os.getenv("AGOL_ITEM_ID")
 N2YO_API_KEY = os.getenv("N2YO_API_KEY")
 
-print("AGOL_USERNAME:", AGOL_USERNAME)
-print("AGOL_ITEM_ID:", AGOL_ITEM_ID)
-print("N2YO_API_KEY:", N2YO_API_KEY)
-
 # Set observer location (Little Rock, AR) and category ID (0 = all categories)
 observer_lat = 34.7465
 observer_lng = -92.2896
@@ -24,18 +20,29 @@ observer_alt = 102  # in meters
 search_radius = 90  # max 90 degrees
 category_id = 0
 
-# Request URL to N2YO API
-url = f"https://api.n2yo.com/rest/v1/satellite/above/{observer_lat}/{observer_lng}/{observer_alt}/{search_radius}/{category_id}/&apiKey={N2YO_API_KEY}"
+# Construct the API request URL
+url = f"https://api.n2yo.com/rest/v1/satellite/above/{observer_lat}/{observer_lng}/{observer_alt}/{search_radius}/{category_id}?apiKey={N2YO_API_KEY}"
+print("Final Request URL:", url)
 
+# Make the request and handle potential issues
 response = requests.get(url)
 print("Status Code:", response.status_code)
-print("Response Text:", response.text)
-data = response.json()
 
+try:
+    data = response.json()
+    print("API returned valid JSON.")
+except Exception as e:
+    print("Failed to parse JSON.")
+    print("Response Text:", response.text)
+    print("Error:", e)
+    exit()
+
+# Check if the key exists
 if "above" not in data:
     print("Error fetching satellite data:", data)
     exit()
 
+# Build features from API response
 satellites = data["above"]
 features = []
 
@@ -65,7 +72,6 @@ gis = GIS("https://www.arcgis.com", AGOL_USERNAME, AGOL_PASSWORD)
 # Access the hosted feature layer
 item = gis.content.get(AGOL_ITEM_ID)
 layer_collection = FeatureLayerCollection.fromitem(item)
-layer_url = item.url + "/0"
 feature_layer = layer_collection.layers[0]
 
 # Clear existing features
@@ -77,3 +83,4 @@ print("Adding new features...")
 feature_layer.edit_features(adds=features)
 
 print("Successfully updated satellite positions.")
+
