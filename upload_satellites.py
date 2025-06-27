@@ -24,7 +24,8 @@ category_id = 0
 url = f"https://api.n2yo.com/rest/v1/satellite/above/{observer_lat}/{observer_lng}/{observer_alt}/{search_radius}/{category_id}?apiKey={N2YO_API_KEY}"
 
 response = requests.get(url)
-print(response.text)
+print("Status Code:", response.status_code)
+print("Response Text:", response.text)
 data = response.json()
 
 if "above" not in data:
