@@ -21,7 +21,7 @@ search_radius = 90  # max 90 degrees
 category_id = 0
 
 # Request URL to N2YO API
-url = f"https://api.n2yo.com/rest/v1/satellite/above/{observer_lat}/{observer_lng}/{observer_alt}/{search_radius}/{category_id}?apiKey={N2YO_API_KEY}"
+url = f"https://api.n2yo.com/rest/v1/satellite/above/{observer_lat}/{observer_lng}/{observer_alt}/{search_radius}/{category_id}/&apiKey={N2YO_API_KEY}"
 
 response = requests.get(url)
 print("Status Code:", response.status_code)
