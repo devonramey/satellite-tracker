@@ -1,6 +1,7 @@
 import requests
 import datetime
 import os
+import csv
 from dotenv import load_dotenv
 from arcgis.gis import GIS
 from arcgis.features import FeatureLayerCollection
@@ -13,40 +14,47 @@ AGOL_PASSWORD = os.getenv("AGOL_PASSWORD")
 AGOL_ITEM_ID = os.getenv("AGOL_ITEM_ID")
 N2YO_API_KEY = os.getenv("N2YO_API_KEY")
 
-# Set observer location (Little Rock, AR) and category ID (0 = all categories)
+# Load satellite metadata into dictionary keyed by satid
+metadata = {}
+with open("satellite_metadata.csv", newline='', encoding='utf-8') as csvfile:
+    reader = csv.DictReader(csvfile)
+    for row in reader:
+        metadata[row["satid"]] = {
+            "country": row["country"],
+            "sattype": row["sattype"],
+            "satpurpose": row["satpurpose"]
+        }
+
+# Set observer location (Little Rock, AR) and category ID
 observer_lat = 34.7465
 observer_lng = -92.2896
-observer_alt = 102  # in meters
-search_radius = 90  # max 90 degrees
+observer_alt = 102
+search_radius = 90
 category_id = 0
 
-# Construct the API request URL
+# Request URL to N2YO API
 url = f"https://api.n2yo.com/rest/v1/satellite/above/{observer_lat}/{observer_lng}/{observer_alt}/{search_radius}/{category_id}?apiKey={N2YO_API_KEY}"
-print("Final Request URL:", url)
-
-# Make the request and handle potential issues
 response = requests.get(url)
 print("Status Code:", response.status_code)
 
 try:
     data = response.json()
-    print("API returned valid JSON.")
 except Exception as e:
-    print("Failed to parse JSON.")
-    print("Response Text:", response.text)
-    print("Error:", e)
+    print("Failed to parse JSON:", e)
+    print("Raw response:", response.text)
     exit()
 
-# Check if the key exists
 if "above" not in data:
-    print("Error fetching satellite data:", data)
+    print("No 'above' key in response:", data)
     exit()
 
-# Build features from API response
 satellites = data["above"]
 features = []
 
 for sat in satellites:
+    satid = str(sat.get("satid"))
+    meta = metadata.get(satid, {})
+    
     attributes = {
         "satid": sat.get("satid"),
         "intDesignator": sat.get("intDesignator"),
@@ -55,13 +63,18 @@ for sat in satellites:
         "satlat": sat.get("satlat"),
         "satlng": sat.get("satlng"),
         "satalt": sat.get("satalt"),
-        "last_updated": datetime.datetime.utcnow().isoformat()
+        "last_updated": datetime.datetime.utcnow().isoformat(),
+        "country": meta.get("country", None),
+        "sattype": meta.get("sattype", None),
+        "satpurpose": meta.get("satpurpose", None)
     }
+
     geometry = {
         "x": sat.get("satlng"),
         "y": sat.get("satlat"),
         "spatialReference": {"wkid": 4326}
     }
+
     features.append({"geometry": geometry, "attributes": attributes})
 
 print(f"Preparing to upload {len(features)} satellite features to AGOL...")
@@ -83,4 +96,5 @@ print("Adding new features...")
 feature_layer.edit_features(adds=features)
 
 print("Successfully updated satellite positions.")
+
 
