@@ -13,6 +13,10 @@ AGOL_PASSWORD = os.getenv("AGOL_PASSWORD")
 AGOL_ITEM_ID = os.getenv("AGOL_ITEM_ID")
 N2YO_API_KEY = os.getenv("N2YO_API_KEY")
 
+print("AGOL_USERNAME:", AGOL_USERNAME)
+print("AGOL_ITEM_ID:", AGOL_ITEM_ID)
+print("N2YO_API_KEY:", N2YO_API_KEY)
+
 # Set observer location (Little Rock, AR) and category ID (0 = all categories)
 observer_lat = 34.7465
 observer_lng = -92.2896
