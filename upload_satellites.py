@@ -21,9 +21,10 @@ search_radius = 90  # max 90 degrees
 category_id = 0
 
 # Request URL to N2YO API
-url = f"https://www.n2yo.com/rest/v1/satellite/above/{observer_lat}/{observer_lng}/{observer_alt}/{search_radius}/{category_id}/&apiKey={N2YO_API_KEY}"
+url = f"https://www.n2yo.com/rest/v1/satellite/above/{observer_lat}/{observer_lng}/{observer_alt}/{search_radius}/{category_id}?apiKey={N2YO_API_KEY}"
 
 response = requests.get(url)
+print(response.text)
 data = response.json()
 
 if "above" not in data:
