@@ -58,7 +58,7 @@ local_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 for sat in satellites:
     satid = sat.get("satid")
-    country_name = csv_country_data.get(satid, None)
+    country_name = csv_country_data.get(int(satid), None) if satid is not None else None
     if country_name:
         enriched_count += 1
 
