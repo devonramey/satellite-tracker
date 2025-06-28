@@ -11,12 +11,9 @@ AGOL_PASSWORD = os.getenv("AGOL_PASSWORD")
 AGOL_ITEM_ID = os.getenv("AGOL_ITEM_ID")
 N2YO_API_KEY = os.getenv("N2YO_API_KEY")
 
-# Download the CSV file from the repo (assumes it's in the same directory)
-csv_file_path = "Merged_Satellite_Data1.csv"
-csv_country_data = {}
 
-# Load satellite metadata from CSV
-with open(csv_file_path, mode="r", encoding="utf-8-sig") as csvfile:
+csv_country_data = {}
+with open("Merged_Satellite_Data1.csv", mode="r", encoding="utf-8-sig") as csvfile:
     reader = csv.DictReader(csvfile)
     for row in reader:
         try:
