@@ -1,8 +1,7 @@
-import pandas as pd
 import requests
 import datetime
 import os
-import pytz
+import pandas as pd
 from dotenv import load_dotenv
 from arcgis.gis import GIS
 from arcgis.features import FeatureLayerCollection
@@ -15,69 +14,59 @@ AGOL_PASSWORD = os.getenv("AGOL_PASSWORD")
 AGOL_ITEM_ID = os.getenv("AGOL_ITEM_ID")
 N2YO_API_KEY = os.getenv("N2YO_API_KEY")
 
-# Set observer location (Little Rock, AR) and category ID (0 = all categories)
+# Observer location (Little Rock, AR) and category
 observer_lat = 34.7465
 observer_lng = -92.2896
-observer_alt = 102  # in meters
-search_radius = 90  # max 90 degrees
+observer_alt = 102
+search_radius = 90
 category_id = 0
 
 # Construct the API request URL
 url = f"https://api.n2yo.com/rest/v1/satellite/above/{observer_lat}/{observer_lng}/{observer_alt}/{search_radius}/{category_id}?apiKey={N2YO_API_KEY}"
-print("Final Request URL:", url)
+print("Requesting data from:", url)
 
-# Make the request and handle potential issues
 response = requests.get(url)
 print("Status Code:", response.status_code)
 
 try:
     data = response.json()
-    print("API returned valid JSON.")
 except Exception as e:
-    print("Failed to parse JSON.")
-    print("Response Text:", response.text)
+    print("Failed to parse JSON from API response.")
+    print("Raw Response:", response.text)
     print("Error:", e)
     exit()
 
-# Check if the key exists
 if "above" not in data:
-    print("Error fetching satellite data:", data)
+    print("Error: No 'above' key in API response.")
     exit()
 
-# Load merged metadata from CSV
-merged_metadata_path = "Merged_Satellite_Data.csv"
-merged_df = pd.read_csv(merged_metadata_path, dtype={"NORAD_CAT_ID": str})
-merged_df["NORAD_CAT_ID"] = merged_df["NORAD_CAT_ID"].str.strip()
+# Load enrichment CSV
+csv_path = "Merged_Satellite_Data.csv"
+csv_data = pd.read_csv(csv_path)
+csv_data["NORAD_CAT_ID"] = pd.to_numeric(csv_data["NORAD_CAT_ID"], errors="coerce")
 
-# Build features from API response
 satellites = data["above"]
 features = []
 enriched_count = 0
 
 for sat in satellites:
-    satid = str(sat.get("satid")).strip()
-    match = merged_df[merged_df["NORAD_CAT_ID"] == satid]
-
-    # Time formatted for AGOL display in Central Time
-    last_updated = datetime.datetime.now(pytz.timezone("US/Central")).strftime("%Y-%m-%d %I:%M:%S %p")
+    sat_id = sat.get("satid")
+    match = csv_data[csv_data["NORAD_CAT_ID"] == sat_id]
+    country_full = match["Country_Full"].values[0] if not match.empty else None
+    if country_full:
+        enriched_count += 1
 
     attributes = {
-        "satid": sat.get("satid"),
+        "satid": sat_id,
         "intDesignator": sat.get("intDesignator"),
         "satname": sat.get("satname"),
         "launchDate": sat.get("launchDate"),
         "satlat": sat.get("satlat"),
         "satlng": sat.get("satlng"),
         "satalt": sat.get("satalt"),
-        "last_updated": last_updated
+        "country": country_full,
+        "last_updated": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
-
-    if not match.empty:
-        attributes["Country"] = match["Country"].values[0]
-        attributes["Country_Full"] = match["Country_Full"].values[0]
-        attributes["SatType"] = match["SatType"].values[0]
-        attributes["SatPurpose"] = match["SatPurpose"].values[0]
-        enriched_count += 1
 
     geometry = {
         "x": sat.get("satlng"),
@@ -87,23 +76,22 @@ for sat in satellites:
 
     features.append({"geometry": geometry, "attributes": attributes})
 
-print(f"Preparing to upload {len(features)} satellite features to AGOL...")
-print(f"Number of enriched features with CSV data: {enriched_count}")
+print(f"Prepared {len(features)} features.")
+print(f"{enriched_count} records enriched with country information.")
 
-# Authenticate with ArcGIS Online
+# Log in to ArcGIS Online
 gis = GIS("https://www.arcgis.com", AGOL_USERNAME, AGOL_PASSWORD)
 
-# Access the hosted feature layer
+# Update AGOL Feature Layer
 item = gis.content.get(AGOL_ITEM_ID)
 layer_collection = FeatureLayerCollection.fromitem(item)
 feature_layer = layer_collection.layers[0]
 
-# Clear existing features
-print("Deleting existing features...")
+print("Clearing existing features...")
 feature_layer.delete_features(where="1=1")
 
-# Add new features
-print("Adding new features...")
+print("Uploading new features...")
 feature_layer.edit_features(adds=features)
 
-print("Successfully updated satellite positions.")
+print("Update complete.")
+
