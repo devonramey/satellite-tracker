@@ -1,11 +1,11 @@
 import requests
 import datetime
 import os
-import pandas as pd
+import csv
 from dotenv import load_dotenv
 from arcgis.gis import GIS
 from arcgis.features import FeatureLayerCollection
-from pytz import timezone, utc
+from pytz import timezone
 
 # Load environment variables
 load_dotenv()
@@ -15,58 +15,51 @@ AGOL_PASSWORD = os.getenv("AGOL_PASSWORD")
 AGOL_ITEM_ID = os.getenv("AGOL_ITEM_ID")
 N2YO_API_KEY = os.getenv("N2YO_API_KEY")
 
-# Observer location (Little Rock, AR) and category ID
+# Set observer location (Little Rock, AR)
 observer_lat = 34.7465
 observer_lng = -92.2896
-observer_alt = 102
+observer_alt = 102  # meters
 search_radius = 90
 category_id = 0
 
-# N2YO API Request
+# Load CSV mapping (satid -> country)
+csv_country_data = {}
+with open("Merged_Satellite_Data1.csv", mode="r", encoding="utf-8-sig") as file:
+    reader = csv.DictReader(file)
+    for row in reader:
+        satid = row.get("satid")
+        country = row.get("country")
+        if satid and country:
+            csv_country_data[int(satid)] = country
+
+print(f"Loaded {len(csv_country_data)} satellite-country mappings.")
+
+# Request satellite data from N2YO
 url = f"https://api.n2yo.com/rest/v1/satellite/above/{observer_lat}/{observer_lng}/{observer_alt}/{search_radius}/{category_id}?apiKey={N2YO_API_KEY}"
 response = requests.get(url)
 
 try:
     data = response.json()
 except Exception as e:
-    print("Failed to parse JSON.")
-    print("Response Text:", response.text)
-    print("Error:", e)
+    print("Failed to parse response:", e)
+    print("Response text:", response.text)
     exit()
 
 if "above" not in data:
-    print("Error fetching satellite data:", data)
+    print("No 'above' key in response.")
     exit()
 
 satellites = data["above"]
-
-# Load satellite metadata CSV
-csv_path = "Merged_Satellite_Data.csv"
-try:
-    metadata_df = pd.read_csv(csv_path)
-    metadata_df = metadata_df[["NORAD_CAT_ID", "Country_Full"]]
-    metadata_df["NORAD_CAT_ID"] = pd.to_numeric(metadata_df["NORAD_CAT_ID"], errors="coerce")
-except Exception as e:
-    print("Failed to read satellite metadata:", e)
-    exit()
-
-# Time zone conversion
-central = timezone('US/Central')
-current_time = datetime.datetime.now(utc).astimezone(central)
-formatted_time = current_time.strftime("%Y-%m-%d %H:%M:%S")
-
 features = []
+now_local = datetime.datetime.now(timezone("US/Central")).strftime("%Y-%m-%d %H:%M:%S")
+
 matched_count = 0
 
 for sat in satellites:
     satid = sat.get("satid")
-    country_match = metadata_df.loc[metadata_df["NORAD_CAT_ID"] == satid]
-
-    if not country_match.empty:
-        country = country_match["Country_Full"].values[0]
+    country = csv_country_data.get(satid)
+    if country:
         matched_count += 1
-    else:
-        country = None
 
     attributes = {
         "satid": satid,
@@ -76,8 +69,8 @@ for sat in satellites:
         "satlat": sat.get("satlat"),
         "satlng": sat.get("satlng"),
         "satalt": sat.get("satalt"),
-        "country": country,
-        "last_updated": formatted_time
+        "last_updated": now_local,
+        "country": country
     }
 
     geometry = {
@@ -88,10 +81,10 @@ for sat in satellites:
 
     features.append({"geometry": geometry, "attributes": attributes})
 
-print(f"Enriched {matched_count} out of {len(satellites)} satellite records with country names.")
-print("Preparing to update AGOL...")
+print(f"Prepared {len(features)} satellite features.")
+print(f"{matched_count} records were enriched with country information.")
 
-# Upload to ArcGIS Online
+# Authenticate and update AGOL feature layer
 gis = GIS("https://www.arcgis.com", AGOL_USERNAME, AGOL_PASSWORD)
 item = gis.content.get(AGOL_ITEM_ID)
 layer_collection = FeatureLayerCollection.fromitem(item)
@@ -100,7 +93,8 @@ feature_layer = layer_collection.layers[0]
 print("Deleting existing features...")
 feature_layer.delete_features(where="1=1")
 
-print("Uploading new features...")
+print("Adding new features...")
 feature_layer.edit_features(adds=features)
 
-print("Update complete.")
+print("Satellite data update complete.")
+
