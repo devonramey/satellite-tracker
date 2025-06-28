@@ -4,42 +4,42 @@ import os
 import csv
 from arcgis.gis import GIS
 from arcgis.features import FeatureLayerCollection
-import os
 
+# --- Debugging file visibility in GitHub Actions ---
 print("Working directory:", os.getcwd())
 print("Files in working directory:", os.listdir())
 
-csv_path = "Merged_Satellite_Data1.csv"
+csv_path = "sat_names.csv"
 if not os.path.exists(csv_path):
     raise FileNotFoundError(f"CSV file not found: {csv_path}")
 
-# Load secrets from environment (GitHub Actions injects these automatically)
+# --- Load secrets from GitHub Actions ---
 AGOL_USERNAME = os.getenv("AGOL_USERNAME")
 AGOL_PASSWORD = os.getenv("AGOL_PASSWORD")
 AGOL_ITEM_ID = os.getenv("AGOL_ITEM_ID")
 N2YO_API_KEY = os.getenv("N2YO_API_KEY")
 
-
+# --- Load satellite country mapping from CSV ---
 csv_country_data = {}
-with open("Merged_Satellite_Data1.csv", mode="r", encoding="utf-8-sig") as csvfile:
+with open(csv_path, mode="r", encoding="utf-8-sig") as csvfile:
     reader = csv.DictReader(csvfile)
     for row in reader:
         try:
             satid = int(row["satid"])
-            csv_country_data[satid] = row["country"].strip()
+            country = row["country"].strip()
+            csv_country_data[satid] = country
         except (ValueError, TypeError, KeyError):
             continue
 
 print(f"Loaded {len(csv_country_data)} satellite country entries from CSV.")
 
-# Set observer location (Little Rock, AR)
+# --- N2YO API parameters ---
 observer_lat = 34.7465
 observer_lng = -92.2896
-observer_alt = 102  # meters
-search_radius = 90  # degrees
+observer_alt = 102
+search_radius = 90
 category_id = 0
 
-# Build N2YO API URL
 url = f"https://api.n2yo.com/rest/v1/satellite/above/{observer_lat}/{observer_lng}/{observer_alt}/{search_radius}/{category_id}?apiKey={N2YO_API_KEY}"
 print("Requesting data from:", url)
 
@@ -57,16 +57,19 @@ if "above" not in data:
     print("No 'above' key in response")
     exit()
 
+# --- Enrich N2YO data with CSV country field ---
 satellites = data["above"]
 features = []
 enriched_count = 0
-
-# Format local time for last_update
 local_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 for sat in satellites:
     satid = sat.get("satid")
-    country_name = csv_country_data.get(int(satid), None) if satid is not None else None
+    try:
+        country_name = csv_country_data.get(int(satid), None) if satid is not None else None
+    except (ValueError, TypeError):
+        country_name = None
+
     if country_name:
         enriched_count += 1
 
@@ -92,17 +95,15 @@ for sat in satellites:
 
 print(f"Prepared {len(features)} features. {enriched_count} had country names.")
 
-# Connect to ArcGIS Online
+# --- Push to ArcGIS Online ---
 gis = GIS("https://www.arcgis.com", AGOL_USERNAME, AGOL_PASSWORD)
 item = gis.content.get(AGOL_ITEM_ID)
 layer_collection = FeatureLayerCollection.fromitem(item)
 feature_layer = layer_collection.layers[0]
 
-# Clear old features
 print("Deleting old features...")
 feature_layer.delete_features(where="1=1")
 
-# Upload new features
 print("Uploading new features...")
 feature_layer.edit_features(adds=features)
 
