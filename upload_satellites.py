@@ -1,7 +1,8 @@
+import pandas as pd
 import requests
 import datetime
 import os
-import csv
+import pytz
 from dotenv import load_dotenv
 from arcgis.gis import GIS
 from arcgis.features import FeatureLayerCollection
@@ -14,47 +15,52 @@ AGOL_PASSWORD = os.getenv("AGOL_PASSWORD")
 AGOL_ITEM_ID = os.getenv("AGOL_ITEM_ID")
 N2YO_API_KEY = os.getenv("N2YO_API_KEY")
 
-# Load satellite metadata into dictionary keyed by satid
-metadata = {}
-with open("satellite_metadata.csv", newline='', encoding='utf-8') as csvfile:
-    reader = csv.DictReader(csvfile)
-    for row in reader:
-        metadata[row["satid"]] = {
-            "country": row["country"],
-            "sattype": row["sattype"],
-            "satpurpose": row["satpurpose"]
-        }
-
-# Set observer location (Little Rock, AR) and category ID
+# Set observer location (Little Rock, AR) and category ID (0 = all categories)
 observer_lat = 34.7465
 observer_lng = -92.2896
-observer_alt = 102
-search_radius = 90
+observer_alt = 102  # in meters
+search_radius = 90  # max 90 degrees
 category_id = 0
 
-# Request URL to N2YO API
+# Construct the API request URL
 url = f"https://api.n2yo.com/rest/v1/satellite/above/{observer_lat}/{observer_lng}/{observer_alt}/{search_radius}/{category_id}?apiKey={N2YO_API_KEY}"
+print("Final Request URL:", url)
+
+# Make the request and handle potential issues
 response = requests.get(url)
 print("Status Code:", response.status_code)
 
 try:
     data = response.json()
+    print("API returned valid JSON.")
 except Exception as e:
-    print("Failed to parse JSON:", e)
-    print("Raw response:", response.text)
+    print("Failed to parse JSON.")
+    print("Response Text:", response.text)
+    print("Error:", e)
     exit()
 
+# Check if the key exists
 if "above" not in data:
-    print("No 'above' key in response:", data)
+    print("Error fetching satellite data:", data)
     exit()
 
+# Load merged metadata from CSV
+merged_metadata_path = "Merged_Satellite_Data.csv"
+merged_df = pd.read_csv(merged_metadata_path, dtype={"NORAD_CAT_ID": str})
+merged_df["NORAD_CAT_ID"] = merged_df["NORAD_CAT_ID"].str.strip()
+
+# Build features from API response
 satellites = data["above"]
 features = []
+enriched_count = 0
 
 for sat in satellites:
-    satid = str(sat.get("satid"))
-    meta = metadata.get(satid, {})
-    
+    satid = str(sat.get("satid")).strip()
+    match = merged_df[merged_df["NORAD_CAT_ID"] == satid]
+
+    # Time formatted for AGOL display in Central Time
+    last_updated = datetime.datetime.now(pytz.timezone("US/Central")).strftime("%Y-%m-%d %I:%M:%S %p")
+
     attributes = {
         "satid": sat.get("satid"),
         "intDesignator": sat.get("intDesignator"),
@@ -63,11 +69,15 @@ for sat in satellites:
         "satlat": sat.get("satlat"),
         "satlng": sat.get("satlng"),
         "satalt": sat.get("satalt"),
-        "last_updated": datetime.datetime.utcnow().isoformat(),
-        "country": meta.get("country", None),
-        "sattype": meta.get("sattype", None),
-        "satpurpose": meta.get("satpurpose", None)
+        "last_updated": last_updated
     }
+
+    if not match.empty:
+        attributes["Country"] = match["Country"].values[0]
+        attributes["Country_Full"] = match["Country_Full"].values[0]
+        attributes["SatType"] = match["SatType"].values[0]
+        attributes["SatPurpose"] = match["SatPurpose"].values[0]
+        enriched_count += 1
 
     geometry = {
         "x": sat.get("satlng"),
@@ -78,6 +88,7 @@ for sat in satellites:
     features.append({"geometry": geometry, "attributes": attributes})
 
 print(f"Preparing to upload {len(features)} satellite features to AGOL...")
+print(f"Number of enriched features with CSV data: {enriched_count}")
 
 # Authenticate with ArcGIS Online
 gis = GIS("https://www.arcgis.com", AGOL_USERNAME, AGOL_PASSWORD)
@@ -96,5 +107,3 @@ print("Adding new features...")
 feature_layer.edit_features(adds=features)
 
 print("Successfully updated satellite positions.")
-
-
