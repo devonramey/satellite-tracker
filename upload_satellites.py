@@ -4,6 +4,14 @@ import os
 import csv
 from arcgis.gis import GIS
 from arcgis.features import FeatureLayerCollection
+import os
+
+print("Working directory:", os.getcwd())
+print("Files in working directory:", os.listdir())
+
+csv_path = "Merged_Satellite_Data1.csv"
+if not os.path.exists(csv_path):
+    raise FileNotFoundError(f"CSV file not found: {csv_path}")
 
 # Load secrets from environment (GitHub Actions injects these automatically)
 AGOL_USERNAME = os.getenv("AGOL_USERNAME")
