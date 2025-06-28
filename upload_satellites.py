@@ -2,21 +2,21 @@ import requests
 import datetime
 import os
 import csv
-from dotenv import load_dotenv
 from arcgis.gis import GIS
 from arcgis.features import FeatureLayerCollection
 
-# Load environment variables from local .env file
-load_dotenv()
-
+# Load secrets from environment (GitHub Actions injects these automatically)
 AGOL_USERNAME = os.getenv("AGOL_USERNAME")
 AGOL_PASSWORD = os.getenv("AGOL_PASSWORD")
 AGOL_ITEM_ID = os.getenv("AGOL_ITEM_ID")
 N2YO_API_KEY = os.getenv("N2YO_API_KEY")
 
-# Load satellite metadata CSV (handles BOM if present)
+# Download the CSV file from the repo (assumes it's in the same directory)
+csv_file_path = "Merged_Satellite_Data1.csv"
 csv_country_data = {}
-with open("Merged_Satellite_Data1.csv", mode="r", encoding="utf-8-sig") as csvfile:
+
+# Load satellite metadata from CSV
+with open(csv_file_path, mode="r", encoding="utf-8-sig") as csvfile:
     reader = csv.DictReader(csvfile)
     for row in reader:
         try:
@@ -34,6 +34,7 @@ observer_alt = 102  # meters
 search_radius = 90  # degrees
 category_id = 0
 
+# Build N2YO API URL
 url = f"https://api.n2yo.com/rest/v1/satellite/above/{observer_lat}/{observer_lng}/{observer_alt}/{search_radius}/{category_id}?apiKey={N2YO_API_KEY}"
 print("Requesting data from:", url)
 
@@ -55,7 +56,7 @@ satellites = data["above"]
 features = []
 enriched_count = 0
 
-# Format local time (ISO without timezone)
+# Format local time for last_update
 local_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 for sat in satellites:
