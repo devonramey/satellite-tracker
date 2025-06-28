@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from arcgis.gis import GIS
 from arcgis.features import FeatureLayerCollection
 
-# Load environment variables
+# Load environment variables from local .env file
 load_dotenv()
 
 AGOL_USERNAME = os.getenv("AGOL_USERNAME")
@@ -14,51 +14,55 @@ AGOL_PASSWORD = os.getenv("AGOL_PASSWORD")
 AGOL_ITEM_ID = os.getenv("AGOL_ITEM_ID")
 N2YO_API_KEY = os.getenv("N2YO_API_KEY")
 
-# Load CSV with satid and country
+# Load satellite metadata CSV (handles BOM if present)
 csv_country_data = {}
-with open("Merged_Satellite_Data1.csv", newline='', encoding="utf-8") as csvfile:
+with open("Merged_Satellite_Data1.csv", mode="r", encoding="utf-8-sig") as csvfile:
     reader = csv.DictReader(csvfile)
     for row in reader:
         try:
-            satid = int(row["satid"].strip())
-            country = row["country"].strip()
-            csv_country_data[satid] = country
+            satid = int(row["satid"])
+            csv_country_data[satid] = row["country"].strip()
         except (ValueError, TypeError, KeyError):
             continue
+
 print(f"Loaded {len(csv_country_data)} satellite country entries from CSV.")
 
-# Observer location (Little Rock, AR)
+# Set observer location (Little Rock, AR)
 observer_lat = 34.7465
 observer_lng = -92.2896
-observer_alt = 102
-search_radius = 90
+observer_alt = 102  # meters
+search_radius = 90  # degrees
 category_id = 0
 
-# Request data from N2YO
 url = f"https://api.n2yo.com/rest/v1/satellite/above/{observer_lat}/{observer_lng}/{observer_alt}/{search_radius}/{category_id}?apiKey={N2YO_API_KEY}"
 print("Requesting data from:", url)
+
 response = requests.get(url)
 print("API status:", response.status_code)
 
 try:
     data = response.json()
 except Exception as e:
-    print("Failed to parse JSON.")
-    print("Response text:", response.text)
+    print("Failed to parse JSON:", e)
+    print("Response:", response.text)
     exit()
 
 if "above" not in data:
-    print("No 'above' key in API response.")
+    print("No 'above' key in response")
     exit()
 
-# Build features
 satellites = data["above"]
 features = []
 enriched_count = 0
 
+# Format local time (ISO without timezone)
+local_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
 for sat in satellites:
     satid = sat.get("satid")
-    country = csv_country_data.get(satid)
+    country_name = csv_country_data.get(satid, None)
+    if country_name:
+        enriched_count += 1
 
     attributes = {
         "satid": satid,
@@ -68,8 +72,8 @@ for sat in satellites:
         "satlat": sat.get("satlat"),
         "satlng": sat.get("satlng"),
         "satalt": sat.get("satalt"),
-        "country": country,
-        "last_update": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        "last_update": local_time,
+        "country": country_name
     }
 
     geometry = {
@@ -80,23 +84,23 @@ for sat in satellites:
 
     features.append({"geometry": geometry, "attributes": attributes})
 
-    if country:
-        enriched_count += 1
-
 print(f"Prepared {len(features)} features. {enriched_count} had country names.")
 
-# Upload to AGOL
+# Connect to ArcGIS Online
 gis = GIS("https://www.arcgis.com", AGOL_USERNAME, AGOL_PASSWORD)
 item = gis.content.get(AGOL_ITEM_ID)
 layer_collection = FeatureLayerCollection.fromitem(item)
 feature_layer = layer_collection.layers[0]
 
+# Clear old features
 print("Deleting old features...")
 feature_layer.delete_features(where="1=1")
 
+# Upload new features
 print("Uploading new features...")
 feature_layer.edit_features(adds=features)
 
 print("Upload complete.")
+
 
 
