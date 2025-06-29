@@ -1,0 +1,35 @@
+name: Phase Two - Filter AGOL Features by Buffer
+
+on:
+  workflow_dispatch:
+
+jobs:
+  run-phase-two:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: 📥 Checkout repository
+      uses: actions/checkout@v3
+
+    - name: 🐍 Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+
+    - name: 🧪 Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install geopandas shapely pandas arcgis python-dotenv
+
+    - name: 🔐 Set up AGOL environment variables
+      env:
+        AGOL_USERNAME: ${{ secrets.AGOL_USERNAME }}
+        AGOL_PASSWORD: ${{ secrets.AGOL_PASSWORD }}
+      run: |
+        echo "AGOL_USERNAME and AGOL_PASSWORD are set."
+
+    - name: 🚀 Run Phase Two Script
+      env:
+        AGOL_USERNAME: ${{ secrets.AGOL_USERNAME }}
+        AGOL_PASSWORD: ${{ secrets.AGOL_PASSWORD }}
+      run: python phase_two.py
