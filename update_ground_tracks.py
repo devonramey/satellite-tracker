@@ -101,7 +101,7 @@ for i in range(0, len(tle_lines), 3):
 
         minutes_range = range(0, PREDICTION_MINUTES * 60, TIME_STEP_SECONDS)
         times = ts.utc(now.year, now.month, now.day, now.hour, now.minute, [s / 60 for s in minutes_range])
-        subpoints = [satellite.subpoint(t) for t in times]
+        subpoints = [satellite.at(t).subpoint() for t in times]
         coords = [(sp.longitude.degrees, sp.latitude.degrees) for sp in subpoints]
         line = LineString(coords)
 
@@ -132,7 +132,7 @@ for i in range(0, len(tle_lines), 3):
                 }
             })
 
-            sp = satellite.subpoint(ts.now())
+            sp = satellite.at(ts.now()).subpoint()
             point_features.append({
                 "geometry": {"x": sp.longitude.degrees, "y": sp.latitude.degrees, "z": sp.elevation.km * 1000, "spatialReference": {"wkid": 4326}},
                 "attributes": {
