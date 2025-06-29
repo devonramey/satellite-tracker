@@ -7,12 +7,12 @@ from shapely.geometry import Point, LineString
 from skyfield.api import EarthSatellite, load
 from arcgis.gis import GIS
 from arcgis.features import FeatureLayer
+from arcgis.geometry import Geometry
 
 # ------------------ Configuration ------------------
-BUFFER_LAYER_ID = "9d53670f33d241ea96cbd7745ac0e27b"
+BUFFER_LAYER_ID = "47b22ce5295e4e3b88c7b40b371945d0"
 POINT_LAYER_ID = "f11fc63900c548da89a4656d538b2e56"
 LINE_LAYER_ID = "7dba0da43d22406898692bd1748bbb8b"
-
 PREDICTION_MINUTES = 60
 TIME_STEP_SECONDS = 30
 CSV_PATH = "sat_names.csv"
@@ -22,8 +22,9 @@ AGOL_USERNAME = os.getenv("AGOL_USERNAME")
 AGOL_PASSWORD = os.getenv("AGOL_PASSWORD")
 SPACETRACK_USERNAME = os.getenv("SPACETRACK_USERNAME")
 SPACETRACK_PASSWORD = os.getenv("SPACETRACK_PASSWORD")
+N2YO_API_KEY = os.getenv("N2YO_API_KEY")
 
-if not all([AGOL_USERNAME, AGOL_PASSWORD, SPACETRACK_USERNAME, SPACETRACK_PASSWORD]):
+if not all([AGOL_USERNAME, AGOL_PASSWORD, SPACETRACK_USERNAME, SPACETRACK_PASSWORD, N2YO_API_KEY]):
     raise EnvironmentError("❌ One or more required environment variables are missing.")
 
 # ------------------ Load CSV ------------------
@@ -48,8 +49,6 @@ buffer_item = gis.content.get(BUFFER_LAYER_ID)
 buffer_layer = buffer_item.layers[0]
 buffers = buffer_layer.query(where="1=1", out_fields="aoi_name", return_geometry=True).features
 
-from arcgis.geometry import Geometry  # ADD THIS IMPORT AT THE TOP
-
 buffer_geoms = []
 for f in buffers:
     geom = f.geometry
@@ -67,10 +66,22 @@ for f in buffers:
         "aoi_name": f.attributes.get("aoi_name")
     })
 
-
 buffer_gdf = gpd.GeoDataFrame(buffer_geoms, geometry="geometry", crs="EPSG:4326")
 
-# ------------------ Space-Track Login ------------------
+# ------------------ Step 1: Query N2YO for Local Sats ------------------
+lat, lon, radius = 34.7465, -92.2896, 50
+n2yo_url = f"https://www.n2yo.com/rest/v1/satellite/above/{lat}/{lon}/{radius}/0/0/&apiKey={N2YO_API_KEY}"
+response = requests.get(n2yo_url)
+n2yo_ids = []
+
+if response.status_code == 200:
+    for sat in response.json().get("above", []):
+        n2yo_ids.append(sat["satid"])
+    print(f"✅ Found {len(n2yo_ids)} satellites over Little Rock from N2YO")
+else:
+    raise RuntimeError(f"❌ Failed to fetch N2YO data: {response.status_code}")
+
+# ------------------ Step 2: Login to Space-Track ------------------
 session = requests.Session()
 login_payload = {
     "identity": SPACETRACK_USERNAME,
@@ -78,10 +89,13 @@ login_payload = {
 }
 session.post("https://www.space-track.org/ajaxauth/login", data=login_payload)
 
-# ------------------ TLE Retrieval ------------------
-query_url = "https://www.space-track.org/basicspacedata/query/class/gp/DECAY_DATE/null-val/EPOCH/>now-1/OBJECT_TYPE/PAYLOAD/orderby/NORAD_CAT_ID/format/3le"
-response = session.get(query_url)
-tle_lines = response.text.strip().split("\n")
+# ------------------ Step 3: Download TLEs for N2YO IDs ------------------
+tle_lines = []
+for norad_id in n2yo_ids:
+    url = f"https://www.space-track.org/basicspacedata/query/class/tle_latest/NORAD_CAT_ID/{norad_id}/orderby/EPOCH desc/limit/1/format/3le"
+    res = session.get(url)
+    if res.ok and len(res.text.strip().splitlines()) == 3:
+        tle_lines.extend(res.text.strip().splitlines())
 
 ts = load.timescale()
 now = datetime.datetime.utcnow()
@@ -90,7 +104,7 @@ last_update_str = now.strftime("%Y-%m-%d %H:%M:%S")
 point_features = []
 line_features = []
 
-# ------------------ TLE Parsing Loop ------------------
+# ------------------ Step 4: Parse and Intersect ------------------
 for i in range(0, len(tle_lines), 3):
     try:
         name = tle_lines[i].strip()
@@ -147,7 +161,7 @@ for i in range(0, len(tle_lines), 3):
                 }
             })
     except Exception as e:
-        print(f"⚠️ Skipping satellite block at index {i} due to error: {e}")
+        print(f"⚠️ Skipping TLE block at index {i} due to error: {e}")
         continue
 
 # ------------------ Push to AGOL ------------------
