@@ -12,19 +12,13 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          path: repo
 
       - name: Set up Python 3.10
         uses: actions/setup-python@v4
         with:
-          python-version: '3.10.13'
-          cache: 'false'
-          
-      - name: Show Python version
-        run: which python && python --version
+          python-version: '3.10'
 
-      - name: Show Python version
+      - name: Display active Python version
         run: python --version
 
       - name: Upgrade pip
