@@ -1,6 +1,5 @@
 requests
 python-dotenv
-arcgis==1.9.1
 skyfield
 pandas
 geopandas
