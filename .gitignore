@@ -8,7 +8,23 @@ env/
 
 # Ignore environment variable files
 .env
+.env.*
 
 # Ignore OS-specific files
 .DS_Store
 Thumbs.db
+
+# Ignore development/editor files
+.vscode/
+*.bak
+*.log
+
+# Ignore output or derived data files
+*.geojson
+*.json
+*.zip
+*.tle
+
+# Ignore all CSV files except the satellite name lookup
+*.csv
+!sat_names.csv
