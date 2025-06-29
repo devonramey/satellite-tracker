@@ -35,7 +35,15 @@ AGOL_ITEM_ID = os.getenv("AGOL_ITEM_ID")
 N2YO_API_KEY = os.getenv("N2YO_API_KEY")
 
 # Validate required secrets
-if not all([AGOL_USERNAME, AGOL_PASSWORD, AGOL_ITEM_ID, N2YO_API_KEY]):
+missing = [k for k, v in {
+    "SPACETRACK_USERNAME": SPACETRACK_USERNAME,
+    "SPACETRACK_PASSWORD": SPACETRACK_PASSWORD,
+    "AGOL_USERNAME": AGOL_USERNAME,
+    "AGOL_PASSWORD": AGOL_PASSWORD,
+}.items() if not v]
+
+if missing:
+    print(f"❌ Missing environment variables: {missing}")
     raise EnvironmentError("❌ One or more required environment variables are missing.")
 
 # Request from N2YO API
