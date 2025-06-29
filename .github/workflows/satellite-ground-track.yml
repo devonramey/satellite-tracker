@@ -1,0 +1,30 @@
+name: Satellite Ground Track Updater
+
+on:
+  schedule:
+    - cron: '17 * * * *'  # Runs hourly at 17 minutes past the hour (avoid :00, :30)
+  workflow_dispatch:      # Allows manual triggering from GitHub Actions UI
+
+jobs:
+  update-ground-tracks:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run ground track updater
+        env:
+          SPACETRACK_USERNAME: ${{ secrets.SPACETRACK_USERNAME }}
+          SPACETRACK_PASSWORD: ${{ secrets.SPACETRACK_PASSWORD }}
+          AGOL_USERNAME: ${{ secrets.AGOL_USERNAME }}
+          AGOL_PASSWORD: ${{ secrets.AGOL_PASSWORD }}
+        run: python src/update_ground_tracks.py
