@@ -1,8 +1,7 @@
 requests
 python-dotenv
-arcgis
+arcgis==1.9.1
 skyfield
 pandas
 geopandas
 shapely
-arcgis==2.0.0
