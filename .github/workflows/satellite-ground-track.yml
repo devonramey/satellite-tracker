@@ -36,6 +36,5 @@ jobs:
           SPACETRACK_PASSWORD: ${{ secrets.SPACETRACK_PASSWORD }}
           AGOL_USERNAME: ${{ secrets.AGOL_USERNAME }}
           AGOL_PASSWORD: ${{ secrets.AGOL_PASSWORD }}
-          N2YO_API_KEY: ${{ secrets.N2YO_API_KEY }}
         run: python update_ground_tracks.py
 
