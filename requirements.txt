@@ -5,3 +5,4 @@ skyfield
 pandas
 geopandas
 shapely
+arcgis==2.0.0
