@@ -50,18 +50,18 @@ login_payload = {
 session.post("https://www.space-track.org/ajaxauth/login", data=login_payload)
 
 # ------------------ TLE Query ------------------
-print("🛰 Fetching TLE data from Space-Track...")
+print("🛰 Fetching TLE data from Space-Track in JSON format...")
 query_url = (
     "https://www.space-track.org/basicspacedata/query/"
     "class/gp/DECAY_DATE/null-val/EPOCH/>now-1/OBJECT_TYPE/PAYLOAD/"
-    "orderby/NORAD_CAT_ID/format/3le"
+    "orderby/NORAD_CAT_ID/format/json"
 )
 response = session.get(query_url)
 if not response.ok:
     raise RuntimeError(f"❌ Space-Track query failed: {response.status_code} - {response.text}")
 
-tle_lines = response.text.strip().split("\n")
-print(f"📥 Retrieved {len(tle_lines) // 3} satellite TLEs.")
+json_data = response.json()
+print(f"📥 Retrieved {len(json_data)} satellite entries.")
 
 # ------------------ Process TLEs ------------------
 ts = load.timescale()
@@ -71,23 +71,32 @@ last_update_str = now.strftime("%Y-%m-%d %H:%M:%S")
 point_features = []
 line_features = []
 
-print("🔁 Processing TLEs...")
-for i in range(0, len(tle_lines), 3):
+print("🔁 Processing satellites...")
+for entry in json_data:
     try:
-        name = tle_lines[i].strip()
-        line1 = tle_lines[i + 1].strip()
-        line2 = tle_lines[i + 2].strip()
+        name = entry.get("OBJECT_NAME")
+        line1 = entry.get("TLE_LINE1")
+        line2 = entry.get("TLE_LINE2")
+        norad_id = int(entry.get("NORAD_CAT_ID"))
+
+        if not line1 or not line2:
+            print(f"⚠️ Missing TLE lines for {name}")
+            continue
+
         satellite = EarthSatellite(line1, line2, name, ts)
-        norad_id = int(''.join(filter(str.isdigit, line1.split()[1])))
 
         minutes_range = range(0, PREDICTION_MINUTES * 60, TIME_STEP_SECONDS)
         times = ts.utc(now.year, now.month, now.day, now.hour, now.minute, [s / 60 for s in minutes_range])
         subpoints = [satellite.at(t).subpoint() for t in times]
         coords = [(sp.longitude.degrees, sp.latitude.degrees) for sp in subpoints]
-        line = LineString(coords)
+        valid_coords = [pt for pt in coords if not any(map(lambda x: x is None or isinstance(x, float) and (x != x), pt))]
+
+        if len(valid_coords) < 2:
+            print(f"⚠️ Skipping satellite {name} (NORAD {norad_id}) due to insufficient coordinates.")
+            continue
 
         line_features.append({
-            "geometry": {"paths": [coords], "spatialReference": {"wkid": 4326}},
+            "geometry": {"paths": [valid_coords], "spatialReference": {"wkid": 4326}},
             "attributes": {
                 "sat_name": name,
                 "norad_cat_id": norad_id,
@@ -113,7 +122,7 @@ for i in range(0, len(tle_lines), 3):
             }
         })
     except Exception as e:
-        print(f"⚠️ Skipping TLE at index {i}: {e}")
+        print(f"⚠️ Skipping satellite due to error: {e}")
         continue
 
 # ------------------ Upload to AGOL ------------------
@@ -128,7 +137,6 @@ line_layer.delete_features(where="1=1")
 line_layer.edit_features(adds=line_features)
 
 print("✅ Upload complete.")
-
 
 
 
