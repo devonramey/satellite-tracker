@@ -53,10 +53,10 @@ buffer_geoms = []
 for f in buffers:
     geom = f.geometry
     try:
-    shape = Point(geom['x'], geom['y']) if 'x' in geom and 'y' in geom else shape.fromEsriJson(geom)
-except Exception as e:
-    print(f"Skipping invalid geometry in buffer: {e} → {geom}")
-    continue
+        shape = Point(geom['x'], geom['y']) if 'x' in geom and 'y' in geom else shape.fromEsriJson(geom)
+    except Exception as e:
+        print(f"Skipping invalid geometry in buffer: {e} → {geom}")
+        continue
 
     buffer_geoms.append({
         "geometry": shape,
