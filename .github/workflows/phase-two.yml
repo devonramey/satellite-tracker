@@ -5,7 +5,7 @@ on:
 
 jobs:
   run-phase-two:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
 
     steps:
     - name: 📥 Checkout repository
@@ -19,17 +19,18 @@ jobs:
     - name: 🧪 Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install geopandas shapely pandas arcgis python-dotenv
+        pip install geopandas shapely pandas python-dotenv
+        pip install arcgis --extra-index-url https://esri.github.io/arcgis-python-api/
 
     - name: 🔐 Set up AGOL environment variables
       env:
         AGOL_USERNAME: ${{ secrets.AGOL_USERNAME }}
         AGOL_PASSWORD: ${{ secrets.AGOL_PASSWORD }}
-      run: |
-        echo "AGOL_USERNAME and AGOL_PASSWORD are set."
+      run: echo "AGOL credentials set."
 
     - name: 🚀 Run Phase Two Script
       env:
         AGOL_USERNAME: ${{ secrets.AGOL_USERNAME }}
         AGOL_PASSWORD: ${{ secrets.AGOL_PASSWORD }}
       run: python phase_two.py
+
