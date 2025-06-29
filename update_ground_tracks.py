@@ -48,6 +48,8 @@ buffer_item = gis.content.get(BUFFER_LAYER_ID)
 buffer_layer = buffer_item.layers[0]
 buffers = buffer_layer.query(where="1=1", out_fields="aoi_name", return_geometry=True).features
 
+from arcgis.geometry import Geometry  # ADD THIS IMPORT AT THE TOP
+
 buffer_geoms = []
 for f in buffers:
     geom = f.geometry
@@ -55,7 +57,7 @@ for f in buffers:
         if 'x' in geom and 'y' in geom:
             shape = Point(geom['x'], geom['y'])
         else:
-            shape = shape.fromEsriJson(geom)
+            shape = Geometry(geom).as_shapely
     except Exception as e:
         print(f"⚠️ Skipping invalid geometry in buffer: {e} → {geom}")
         continue
