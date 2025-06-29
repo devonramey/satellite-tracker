@@ -69,8 +69,14 @@ for f in buffers:
 buffer_gdf = gpd.GeoDataFrame(buffer_geoms, geometry="geometry", crs="EPSG:4326")
 
 # ------------------ Step 1: Query N2YO for Local Sats ------------------
-lat, lon, radius = 34.7465, -92.2896, 50
-n2yo_url = f"https://www.n2yo.com/rest/v1/satellite/above/{lat}/{lon}/{radius}/0/0/&apiKey={N2YO_API_KEY}"
+observer_lat = 34.7465
+observer_lng = -92.2896
+observer_alt = 102  # meters
+search_radius = 90  # degrees
+category_id = 0
+
+n2yo_url = f"https://api.n2yo.com/rest/v1/satellite/above/{observer_lat}/{observer_lng}/{observer_alt}/{search_radius}/{category_id}?apiKey={N2YO_API_KEY}"
+print("Requesting data from N2YO API:", n2yo_url)
 response = requests.get(n2yo_url)
 n2yo_ids = []
 
@@ -178,5 +184,6 @@ line_layer.delete_features(where="1=1")
 line_layer.edit_features(adds=line_features)
 
 print("✅ Upload complete.")
+
 
 
