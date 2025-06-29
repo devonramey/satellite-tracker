@@ -76,7 +76,9 @@ session.post("https://www.space-track.org/ajaxauth/login", data=login_payload)
 
 # ------------------ TLE Retrieval ------------------
 print("🛰 Fetching TLE data from Space-Track...")
-query_url = "https://www.space-track.org/basicspacedata/query/class/gp/DECAY_DATE/null-val/EPOCH/>now-1/OBJECT_TYPE/PAYLOAD/orderby/NORAD_CAT_ID/format/3le"
+query_url = "https://www.space-track.org/basicspacedata/query/"
+    "class/tle_latest/DECAY_DATE/null-val/OBJECT_TYPE/PAYLOAD/"
+    "orderby/NORAD_CAT_ID/format/3le"
 response = session.get(query_url)
 tle_lines = response.text.strip().split("\n")
 print(f"📥 Retrieved {len(tle_lines) // 3} satellite TLEs.")
