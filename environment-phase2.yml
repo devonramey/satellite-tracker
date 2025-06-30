@@ -1,0 +1,12 @@
+name: arcgis-env
+channels:
+  - esri
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.9
+  - arcgis=2.3.1
+  - geopandas
+  - shapely
+  - pandas
+  - python-dotenv
