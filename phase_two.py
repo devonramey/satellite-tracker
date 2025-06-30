@@ -21,7 +21,7 @@ print("Logging into ArcGIS Online...")
 gis = GIS("https://www.arcgis.com", AGOL_USERNAME, AGOL_PASSWORD)
 
 # ------------------ Load Buffer ------------------
-print("🌐 Loading buffer layer...")
+print("Loading buffer layer...")
 buffer_layer = gis.content.get(BUFFER_LAYER_ID).layers[0]
 buffer_features = buffer_layer.query(where="1=1", return_geometry=True).features
 buffer_shapes = [Geometry(f.geometry).as_shapely for f in buffer_features]
