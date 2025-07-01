@@ -20,7 +20,7 @@ SPACETRACK_USERNAME = os.getenv("SPACETRACK_USERNAME")
 SPACETRACK_PASSWORD = os.getenv("SPACETRACK_PASSWORD")
 
 if not all([AGOL_USERNAME, AGOL_PASSWORD, SPACETRACK_USERNAME, SPACETRACK_PASSWORD]):
-    raise EnvironmentError("❌ Missing required environment variables.")
+    raise EnvironmentError("Missing required environment variables.")
 
 # ------------------ Load CSV ------------------
 csv_country_data = {}
@@ -32,15 +32,15 @@ with open(CSV_PATH, mode="r", encoding="utf-8-sig", newline='') as csvfile:
             country = row["country"].strip()
             csv_country_data[satid] = country
         except Exception as e:
-            print(f"⚠️ Skipping row: {e}, data: {row}")
-print(f"✅ Loaded {len(csv_country_data)} satellite-country entries.")
+            print(f"Skipping row: {e}, data: {row}")
+print(f"Loaded {len(csv_country_data)} satellite-country entries.")
 
 # ------------------ AGOL Login ------------------
-print("🔐 Logging into ArcGIS Online...")
+print("Logging into ArcGIS Online...")
 gis = GIS("https://www.arcgis.com", AGOL_USERNAME, AGOL_PASSWORD)
 
 # ------------------ Space-Track Login ------------------
-print("🌐 Logging into Space-Track...")
+print("Logging into Space-Track...")
 session = requests.Session()
 login_payload = {
     "identity": SPACETRACK_USERNAME,
@@ -57,10 +57,10 @@ query_url = (
 )
 response = session.get(query_url)
 if not response.ok:
-    raise RuntimeError(f"❌ Space-Track query failed: {response.status_code} - {response.text}")
+    raise RuntimeError(f"Space-Track query failed: {response.status_code} - {response.text}")
 
 tle_data = response.json()
-print(f"📥 Retrieved {len(tle_data)} satellite entries.")
+print(f"Retrieved {len(tle_data)} satellite entries.")
 
 # ------------------ Process TLEs ------------------
 ts = load.timescale()
@@ -70,7 +70,7 @@ last_update_str = now.strftime("%Y-%m-%d %H:%M:%S")
 point_features = []
 line_features = []
 
-print("🔁 Processing satellites...")
+print("Processing satellites...")
 for entry in tle_data:
     try:
         name = entry.get("OBJECT_NAME", "UNKNOWN")
@@ -89,7 +89,7 @@ for entry in tle_data:
         valid_coords = [pt for pt in coords if not any(map(lambda x: x is None or (isinstance(x, float) and x != x), pt))]
 
         if len(valid_coords) < 2:
-            print(f"⚠️ Skipping satellite {name} (NORAD {norad_id}) due to insufficient coordinates.")
+            print(f"Skipping satellite {name} (NORAD {norad_id}) due to insufficient coordinates.")
             continue
 
         line_features.append({
@@ -125,7 +125,7 @@ for entry in tle_data:
         })
 
     except Exception as e:
-        print(f"⚠️ Skipping satellite {entry.get('OBJECT_NAME', 'UNKNOWN')}: {e}")
+        print(f"Skipping satellite {entry.get('OBJECT_NAME', 'UNKNOWN')}: {e}")
         continue
 
 # ------------------ Upload Helper ------------------
@@ -134,12 +134,12 @@ def upload_in_batches(layer, features, batch_size=250):
         batch = features[i:i + batch_size]
         result = layer.edit_features(adds=batch)
         if not result.get("addResults") or not all(r.get("success") for r in result["addResults"]):
-            print(f"⚠️ Upload failed for batch {i}-{i+batch_size}")
+            print(f"Upload failed for batch {i}-{i+batch_size}")
         else:
-            print(f"✅ Uploaded batch {i}-{i+batch_size}")
+            print(f"Uploaded batch {i}-{i+batch_size}")
 
 # ------------------ Upload to AGOL ------------------
-print(f"🚀 Uploading {len(point_features)} points and {len(line_features)} lines...")
+print(f"Uploading {len(point_features)} points and {len(line_features)} lines...")
 
 point_layer = gis.content.get(POINT_LAYER_ID).layers[0]
 line_layer = gis.content.get(LINE_LAYER_ID).layers[0]
@@ -150,7 +150,7 @@ upload_in_batches(point_layer, point_features)
 line_layer.delete_features(where="1=1")
 upload_in_batches(line_layer, line_features)
 
-print("✅ Upload complete.")
+print("Upload complete.")
 
 
 
