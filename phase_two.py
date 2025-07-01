@@ -93,7 +93,7 @@ point_agol_features = gdf_to_features(intersect_points, is_point=True)
 line_agol_features = gdf_to_features(intersect_lines, is_point=False)
 
 # ------------------ Update AGOL Layers ------------------
-print(f"🚀 Updating AGOL: {len(point_agol_features)} point(s), {len(line_agol_features)} line(s)")
+print(f"Updating AGOL: {len(point_agol_features)} point(s), {len(line_agol_features)} line(s)")
 
 point_layer.delete_features(where="1=1")
 if point_agol_features:
